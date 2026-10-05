@@ -1,0 +1,14 @@
+# Секреты — никогда не коммитить
+.secrets/
+*.token
+*.pass
+week-roles.json
+
+# Локальные артефакты сборки
+artifacts/
+decrypted-pages/
+node_modules/
+
+# Системное
+.DS_Store
+*.log

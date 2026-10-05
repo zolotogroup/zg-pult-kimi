@@ -1,0 +1,36 @@
+name: refresh-pult
+
+on:
+  schedule:
+    # Воскресенье и четверг, 23:21 МСК (20:21 UTC)
+    - cron: '21 20 * * 0,4'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Обновить просрочки из ПланФикса
+        env:
+          PLANFIX_TOKEN: ${{ secrets.PLANFIX_TOKEN }}
+          PORTAL_PASS: ${{ secrets.PORTAL_PASS }}
+        run: node scripts/refresh-pult.mjs
+
+      - name: Коммит и пуш
+        run: |
+          git config user.name "zg-pult-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/pult.bin hub.html
+          git diff --cached --quiet || {
+            git commit -m "pult: просрочки обновлены $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push
+          }

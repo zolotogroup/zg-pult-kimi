@@ -1,0 +1,84 @@
+name: weekly
+
+on:
+  schedule:
+    # Суббота 23:09 МСК — сборка минувшей недели (20:09 UTC)
+    - cron: '9 20 * * 6'
+    # Понедельник 09:17 МСК — отправка 10 писем (06:17 UTC)
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Что сделать'
+        type: choice
+        options: [build, send]
+        default: build
+
+permissions:
+  contents: write
+
+jobs:
+  # --- Сборка недели (суббота) ---
+  build:
+    if: github.event.schedule == '9 20 * * 6' || github.event.inputs.action == 'build'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Собрать неделю (деньги ПланФакт + срезы ПланФикс)
+        env:
+          PORTAL_PASS: ${{ secrets.PORTAL_PASS }}
+          PLANFACT_TOKEN: ${{ secrets.PLANFACT_TOKEN }}
+          PLANFIX_TOKEN: ${{ secrets.PLANFIX_TOKEN }}
+          WEEK_ROLES_JSON: ${{ secrets.WEEK_ROLES_JSON }}
+          WEEK_BASE_PASS: ${{ secrets.WEEK_BASE_PASS }}
+          WORKING_SATURDAYS_JSON: ${{ secrets.WORKING_SATURDAYS_JSON }}
+          PORTAL_URL: ${{ vars.PORTAL_URL }}
+        run: node scripts/build-week.mjs
+
+      - name: Проверить вес
+        run: node scripts/shrink-check.mjs
+
+      - name: Артефакты писем (для понедельника)
+        uses: actions/upload-artifact@v4
+        with:
+          name: letters
+          path: artifacts/letters
+          retention-days: 7
+
+      - name: Коммит и пуш
+        run: |
+          git config user.name "zg-pult-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/week.bin hub.html
+          git diff --cached --quiet || {
+            git commit -m "week: неделя собрана $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push
+          }
+
+  # --- Отправка писем (понедельник) ---
+  send:
+    if: github.event.schedule == '17 6 * * 1' || github.event.inputs.action == 'send'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Скачать артефакты последней успешной сборки
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RUN_ID=$(gh run list --workflow weekly.yml --status completed --json databaseId,conclusion --jq '[.[] | select(.conclusion=="success")][0].databaseId')
+          [ -n "$RUN_ID" ] || { echo "Нет успешной сборки недели"; exit 1; }
+          gh run download "$RUN_ID" -n letters -D artifacts/letters
+
+      - name: Отправить 10 писем через Apps Script
+        env:
+          GAS_URL: ${{ secrets.GAS_URL }}
+          GAS_TOKEN: ${{ secrets.GAS_TOKEN }}
+        run: node scripts/send-letters.mjs
