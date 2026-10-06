@@ -79,6 +79,6 @@ jobs:
 
       - name: Отправить 10 писем через Apps Script
         env:
-          GAS_URL: ${{ secrets.GAS_URL }}
+          GAS_URL: ${{ vars.GAS_URL }}
           GAS_TOKEN: ${{ secrets.GAS_TOKEN }}
         run: node scripts/send-letters.mjs
