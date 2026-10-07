@@ -4,6 +4,8 @@
 // токен из TOKEN ниже — в GAS_TOKEN (GitHub Secrets).
 //
 // Приём: doPost({token, items:[{to, subject, html, pdfB64?, pdfName?}]}) → рассылает через Gmail.
+//        doPost({token, action:'save', folder:'<подпапка>', files:[{name, content}]}) → сохраняет в Drive
+//        (папка «ZG Pult Letters» в корне Drive, перезаписывает файлы с тем же именем).
 
 const TOKEN = 'СМЕНИТЕ_НА_ДЛИННУЮ_СЛУЧАЙНУЮ_СТРОКУ';
 
